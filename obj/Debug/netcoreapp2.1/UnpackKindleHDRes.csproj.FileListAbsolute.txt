@@ -1,0 +1,11 @@
+E:\UnpackKindleHDRes\bin\Debug\netcoreapp2.1\UnpackKindleHDRes.deps.json
+E:\UnpackKindleHDRes\bin\Debug\netcoreapp2.1\UnpackKindleHDRes.runtimeconfig.json
+E:\UnpackKindleHDRes\bin\Debug\netcoreapp2.1\UnpackKindleHDRes.runtimeconfig.dev.json
+E:\UnpackKindleHDRes\bin\Debug\netcoreapp2.1\UnpackKindleHDRes.dll
+E:\UnpackKindleHDRes\bin\Debug\netcoreapp2.1\UnpackKindleHDRes.pdb
+E:\UnpackKindleHDRes\obj\Debug\netcoreapp2.1\UnpackKindleHDRes.csprojAssemblyReference.cache
+E:\UnpackKindleHDRes\obj\Debug\netcoreapp2.1\UnpackKindleHDRes.csproj.CoreCompileInputs.cache
+E:\UnpackKindleHDRes\obj\Debug\netcoreapp2.1\UnpackKindleHDRes.AssemblyInfoInputs.cache
+E:\UnpackKindleHDRes\obj\Debug\netcoreapp2.1\UnpackKindleHDRes.AssemblyInfo.cs
+E:\UnpackKindleHDRes\obj\Debug\netcoreapp2.1\UnpackKindleHDRes.dll
+E:\UnpackKindleHDRes\obj\Debug\netcoreapp2.1\UnpackKindleHDRes.pdb
