@@ -37,7 +37,6 @@ namespace UnpackKindleHDRes
     }
     class Program
     {
-        static string path = "CR!207ZKDES1D7Y7AV85CMEZQKD67SA.azw.res";
         static byte[] azw6_data;
         static ushort section_count = 0;
         static SectionInfo[] section_info;
@@ -49,7 +48,7 @@ namespace UnpackKindleHDRes
             if(args.Length>=2)save_dir=args[1];
             if(!Directory.Exists(save_dir)){Directory.CreateDirectory(save_dir);}
             Console.OutputEncoding = Encoding.UTF8;
-            azw6_data = File.ReadAllBytes(path);
+            azw6_data = File.ReadAllBytes(args[0]);
             string r;
             Console.WriteLine("=========Dump Sections:");
             r = DumpSections(); Console.WriteLine(r); if (r != "OK") { return; }
