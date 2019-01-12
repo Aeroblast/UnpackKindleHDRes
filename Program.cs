@@ -271,9 +271,9 @@ namespace UnpackKindleHDRes
             if(data[0]==0xff&&data[1]==0xd8)
             {
                 count++;
-                
-                File.WriteAllBytes(count+".jpeg",data);
-                return "           Saved "+count+".JPEG";
+                string path=Path.Combine(save_dir,count+".jpg");
+                File.WriteAllBytes(path,data);
+                return "           Saved "+path;
             }
             return "Unhandled Format";
         }
