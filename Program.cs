@@ -1,11 +1,14 @@
 ﻿using System;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 
 //简单重现python脚本过程 https://www.mobileread.com/forums/showpost.php?p=3114050&postcount=1145
+//改进文件命名
+//【可选】读取KindleUnpack的assembled_text.dat和xhtml，替换图片
 namespace UnpackKindleHDRes
 {
     struct SectionInfo
@@ -41,12 +44,27 @@ namespace UnpackKindleHDRes
         static ushort section_count = 0;
         static SectionInfo[] section_info;
         public static string title;
-        static string save_dir="OutputImage";
+        static string[] hrefs;
+        static string save_path = "OutputImage";
+        static string[] saved_paths;
+        static int saved_count = 0;
+        static bool epub=false;
         static void Main(string[] args)
         {
-            if(args.Length==0||!File.Exists(args[0])){Console.WriteLine("Give me .azw.res file plz.");return;}
-            if(args.Length>=2)save_dir=args[1];
-            if(!Directory.Exists(save_dir)){Directory.CreateDirectory(save_dir);}
+            if (args.Length == 0 || !File.Exists(args[0])) { Console.WriteLine("Give me .azw.res file plz."); return; }
+            if (args.Length >= 2) save_path = args[1];
+            if(Path.GetFileName(save_path)=="assembled_text.dat")
+            {
+                if(!File.Exists(save_path)){Console.WriteLine("Plz Check the KindleUnpack output.");return;}
+                save_path=Path.GetDirectoryName(save_path);
+                if(!Directory.Exists(save_path)){Console.WriteLine("Plz Check the Output path.");return;}
+                epub=true;
+            }else
+            if (!Directory.Exists(save_path)) 
+            {
+                if(File.Exists(save_path)){Console.WriteLine("Plz Check the Output path.");return;}
+                 Directory.CreateDirectory(save_path); 
+            }
             Console.OutputEncoding = Encoding.UTF8;
             azw6_data = File.ReadAllBytes(args[0]);
             string r;
@@ -57,9 +75,43 @@ namespace UnpackKindleHDRes
             r = ReadHeaderSection(); Console.WriteLine(r); if (r != "OK") { return; }
 
             Console.WriteLine("=========Read Sections:");
+            if (saved_paths == null) { Console.WriteLine("Error"); return; }
             foreach (SectionInfo info in section_info)
             {
                 r = ReadSection(GetSectionData(info)); if (r != "OK") { Console.WriteLine(r); return; }
+            }
+            hrefs=VaildHref(hrefs);
+            if(hrefs.Length==(int)saved_paths.Length)
+            {
+                int i=0,j=0;
+                Regex regex=new Regex("kindle:embed:(.*?)\\?mime=image/(.*)");
+                for(;i<hrefs.Length&&j<saved_paths.Length;)
+                {
+
+                    while(!regex.Match(hrefs[i]).Success){i++;}
+                    Match match=regex.Match(hrefs[i]);
+                    string target_path=Path.Combine(save_path,match.Groups[1].Value+"."+match.Groups[2].Value);
+                    if(File.Exists(target_path))File.Delete(target_path);
+                    File.Move(
+                        saved_paths[j],
+                        target_path
+                    );
+                    saved_paths[i]=target_path;
+                    j++;i++;
+
+                }
+
+            }
+            else
+            {
+                Console.WriteLine("Rename Failure");return;
+            }
+
+            if(epub)
+            {
+                Console.WriteLine("=======Rename to KindleUnpack Epub");
+               r= ReplaceEpubImage();
+               Console.WriteLine(r);
             }
             Console.WriteLine("END");
 
@@ -196,18 +248,20 @@ namespace UnpackKindleHDRes
                 {
                     string a = Encoding.UTF8.GetString(SubArray(ext, pos + 8, size - 8));
                     Console.WriteLine(" " + id_map_strings[id] + ":" + a);
+
                 }
                 else
                 if (id_map_values.ContainsKey(id))
                 {
-                    string a;
+                    UInt32 a = 0;
                     switch (size)
                     {
-                        case 9: a = GetUInt8(ext, pos + 8).ToString(); break;
-                        case 10: a = GetUInt16(ext, pos + 8).ToString(); break;
-                        case 12: a = GetUInt32(ext, pos + 8).ToString(); break;
-                        default: a = "unexpected size!"; break;
+                        case 9: a = GetUInt8(ext, pos + 8); break;
+                        case 10: a = GetUInt16(ext, pos + 8); break;
+                        case 12: a = GetUInt32(ext, pos + 8); break;
+                        default: Console.Write("unexpected size!"); break;
                     }
+                    if (id == 125) { saved_paths = new string[a]; }//count of res
                     Console.WriteLine(" " + id_map_values[id] + ":" + a);
                 }
                 else
@@ -252,32 +306,100 @@ namespace UnpackKindleHDRes
                 Console.Write(" Type:" + sec_type_map[x]);
                 if (x == i32("kind"))
                 {
-                    string[] hrefs = Encoding.UTF8.GetString(section_data).Split('|');
-                }else
-                if(x==i32("CRES"))
+                    hrefs = Encoding.UTF8.GetString(section_data).Split('|');
+                }
+                else
+                if (x == i32("CRES"))
                 {
                     Console.Write(
-                    ReadCRES(SubArray(section_data,12,(ulong)section_data.Length-12))
+                    ReadCRES(SubArray(section_data, 12, (ulong)section_data.Length - 12))
                     );
                 }
                 Console.WriteLine();
             }
             return "OK";
         }
-        static int count=0;
-        static string ReadCRES(byte[]data)
+        static int count = 0;
+        static string ReadCRES(byte[] data)
         {
-            if(data[0]==0xff&&data[1]==0xd8)
+            if (data[0] == 0xff && data[1] == 0xd8)
             {
                 count++;
-                string path=Path.Combine(save_dir,count+".jpg");
-                File.WriteAllBytes(path,data);
-                return "           Saved "+path;
+                string path = Path.Combine(save_path, count + ".jpg");
+                saved_paths[saved_count] = path; saved_count++;
+                File.WriteAllBytes(path, data);
+                return "           Saved " + path;
             }
             return "Unhandled Format";
         }
+        static string ReplaceEpubImage()
+        {
+            string raw_text=File.ReadAllText(Path.Combine(save_path,"assembled_text.dat"));
+            Regex regex=new Regex("(<html xmlns[\\s\\S]*?</html>)");
+            MatchCollection ms= regex.Matches(raw_text);
+            List<string> raws=new List<string>();
+            foreach(Match m in ms)raws.Add(m.Groups[1].Value);
+            string [] infos=Directory.GetFiles(Path.Combine(save_path,"OEBPS\\Text"));
+            List<string> texts=new List<string>();
+            regex=new Regex("part[0-9]{4}\\.xhtml");
+            foreach(string s in infos)
+            {
+                if(regex.Match(Path.GetFileName(s)).Success){texts.Add(s);}
+            }
+            if(raws.Count!=texts.Count)
+            {
+                return "Epub Proc Failure.";
+            }
+            for(int i=0;i<saved_paths.Length;i++)
+            {
+                bool found=false;
+                for(int j=0;j<raws.Count;j++)
+                {
+                    if(raws[j].Contains(hrefs[i]))
+                    {
+                        string[]raw_lines=raws[j].Split('\n');
+                        string[]epub_lines=File.ReadAllLines(texts[j]);
+                        if(raw_lines.Length!=epub_lines.Length){return "text error";}
+                        regex=new Regex("src=\"(.*)\"");
+                        for(int k=0;k<raw_lines.Length;k++)
+                        {
+                            MatchCollection raw_matches=regex.Matches(raw_lines[k]);
+                            if(raw_matches.Count==0)continue;
+                            MatchCollection epub_matches=regex.Matches(epub_lines[k]);
+                            if(raw_matches.Count!=epub_matches.Count){return "match error";}
+                            for(int n=0;n<raw_matches.Count;n++)
+                            {
+                                if(raw_matches[n].Groups[1].Value==hrefs[i])
+                                {
+                                    found=true;
+                                    string new_name=Path.Combine(
+                                        save_path,
+                                    Path.GetFileName(epub_matches[n].Groups[1].Value) 
+                                    );
+                                    File.Move(saved_paths[i],new_name);
+                                    Console.WriteLine(" Rename "+Path.GetFileName(saved_paths[i])+" to "+Path.GetFileName(epub_matches[n].Groups[1].Value));
+                                    break;
+                                }
+                            }
+                            if(found)break;
+                        }//search in every line
+                        
 
+                    }
+                    if(found)break;
+                    
+                }//search in every xhtml 
 
+            }//for each href
+            return "OK";
+        }
+        static string[] VaildHref(string[] hs)
+        {
+            List<string> ist=new List<string>();
+            Regex regex=new Regex("kindle:embed:(.*?)\\?mime=image/(.*)");
+            foreach (string s in hs) { if (regex.Match(s).Success) ist.Add(s); }
+            return ist.ToArray();
+        }
         //utils
         static byte[] SubArray(byte[] src, ulong start, ulong length)
         {
